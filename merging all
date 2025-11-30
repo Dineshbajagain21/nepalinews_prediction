@@ -1,0 +1,48 @@
+import pandas as pd
+import pickle as pk
+from fastapi import FastAPI
+
+app = FastAPI()
+
+dbfile1 = open('salary.pickle', 'rb')    
+model1 = pk.load(dbfile1)
+
+dbfile2 = open('coronamodel.pickle', 'rb')    
+model2 = pk.load(dbfile2)
+
+@app.get("/")
+def read_root():
+    return {"Hello": "World"}
+
+
+@app.get("/salary/")
+def read_item(age: int,exp: int,gender: bool,b: bool,m: bool,p: bool):
+    df = pd.DataFrame({
+    'Age':[age],
+    'Years of Experience':[exp],
+    'Male':[gender],
+    "Bachelor's":[b],
+    "Master's":[m],
+    "PhD":[p]
+    })
+    result = round(model1.predict(df)[0][0],2)
+    return {"result": result}
+
+    # ModuleNotFoundError: No module named 'langchain_community.gemini'
+     
+@app.get("/covid")
+def read_item(Cough_symptoms: bool, Fever:bool,Sore_throat:bool,Shortness_of_breath:bool,Headache:bool,Known_contact:int):
+    df = pd.DataFrame({
+        'Cough_symptoms':[Cough_symptoms],
+        'Fever':[Fever],
+        'Sore_throat':[Sore_throat],
+        'Shortness_of_breath':[Shortness_of_breath],
+        'Headache':[Headache],
+        'Known_contact':[Known_contact]
+        })
+    result = model2.predict(df)[0]
+    if result == 1:
+        return {"result":"Covid Positive"}
+    else:
+        return {"result":"Covid Negitive"}
+

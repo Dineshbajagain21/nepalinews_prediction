@@ -1,95 +1,51 @@
-# File: nepalinewsprediction.py
-
-import pandas as pd
-import re
+import streamlit as st
 import pickle
-from fastapi import FastAPI
+import re
 import sys
-
-
-# ============================================
-# 1️⃣ Custom Nepali Tokenizer (your real tokenizer)
-# ============================================
+import numpy as np
+# -----------------------------
+# Tokenizer (same as training)
+# -----------------------------
 def nepali_tokenizer(text):
-    """
-    Custom tokenizer used during model training.
-    """
     text = re.sub(r"[^अ-ह०-९\s]", " ", text)
     tokens = text.split()
+    stopwords = ["र", "का", "की", "ले", "छ", "था", "देखि", "मा", "को"]
+    return [t for t in tokens if t not in stopwords]
 
-    nepali_stopwords = ["र", "का", "की", "ले", "छ", "था", "देखि", "मा", "को"]
-    tokens = [t for t in tokens if t not in nepali_stopwords]
-
-    return tokens
-
-
-# ============================================
-# 2️⃣ FIX — Register tokenizer name for pickle
-# ============================================
-# This allows pickle to find the tokenizer during model loading
 sys.modules['__main__'].nepali_tokenizer = nepali_tokenizer
 
+# -----------------------------
+# Load model
+# -----------------------------
+MODEL_PATH = "Nepalinewsregression2.pickle"
+try:
+    with open(MODEL_PATH, "rb") as f:
+        model = pickle.load(f)
+except Exception as e:
+    st.error(f"Could not load model: {e}")
+    st.stop()
 
-# ============================================
-# 3️⃣ Load your trained model safely
-# ============================================
-with open("Nepalinewsregression2.pickle", "rb") as f:
-    model = pickle.load(f)
+# -----------------------------
+# Streamlit UI
+# -----------------------------
+st.title("📰 Nepali News Classification (Raw Output)")
+st.write("Enter Nepali news and see the model's raw predicted category.")
 
+news_text = st.text_area("Enter Nepali news:")
 
-# ============================================
-# 4️⃣ FastAPI app
-# ============================================
-app = FastAPI(
-    title="Nepali News Classifier",
-    description="Enter Nepali news text and get predicted category",
-    version="1.0"
-)
+if st.button("🔍 Predict Category"):
+    if not news_text.strip():
+        st.warning("Please enter some text!")
+    else:
+        try:
+            # Predict raw output
+            raw_pred = model.predict([news_text])
+            
+            # If output is array/list, get first element
+            predicted_category = raw_pred[0] if isinstance(raw_pred, (list, tuple, np.ndarray)) else raw_pred
 
+            st.success(f"📌 Predicted Category: **{predicted_category}**")
+            st.write("🔧 Raw model output:", raw_pred)
 
-# ============================================
-# 5️⃣ News categories
-# ============================================
-categories = {
-    0: "politics",
-    1: "entertainment",
-    2: "finance",
-    3: "film",
-    4: "science_technology",
-    5: "literature",
-    6: "society",
-    7: "opinion",
-    8: "tourism",
-    9: "national",
-    10: "migration",
-    11: "corporate",
-    12: "accidents",
-    13: "sports",
-    14: "wealth",
-    15: "health",
-    16: "auto",
-    17: "interview"
-}
-
-
-# ============================================
-# 6️⃣ Prediction endpoint
-# ============================================
-@app.post("/predict_news")
-def predict_news(news_text: str):
-    df = pd.DataFrame({'predict_news': [news_text]})
-    prediction = model.predict(df['predict_news'])[0]
-    
-    # Also return the raw prediction to debug
-    return {
-        "input_text": news_text,
-        "raw_model_output": prediction
-    }
-
-
-# ============================================
-# 7️⃣ Root endpoint
-# ============================================
-@app.get("/")
-def root():
-    return {"message": "Welcome to Nepali News Classifier API. Use POST /predict_news"}
+        except Exception as e:
+            st.error(f"Prediction error: {e}")
